@@ -6,6 +6,10 @@ its requirements usign the
 [DOREF](https://www.pimes.fh-dortmund.de/gitlab/re-research-group/doref)
 framework.
 
+##TODO:
+
+- [ ] Create PlantUML Diagrams
+
 ## Installing dependencies
 
 First ```latex``` package have to be installed by running;
@@ -18,6 +22,7 @@ First ```latex``` package have to be installed by running;
   texlive-lang-german
 
 ```
+**Note:** if you have earlier installed graphviz or sphinx for python2.7, it is recommended to uninstall them before proceeding.
 
 Now install ```graphviz``` by running;
 
@@ -70,6 +75,6 @@ DOREF running;
 Build the documentation running;
 
 ```
-$ cd <project-root>
-$ python main.py
+(venv)$ cd <project-root>
+(venv$ python main.py
 ```

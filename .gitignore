@@ -90,3 +90,6 @@ ENV/
 
 # DOREF output dir
 doc/
+
+# LaTeX
+*eps-converted-to.pdf

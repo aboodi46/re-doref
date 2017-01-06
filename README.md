@@ -76,5 +76,5 @@ Build the documentation running;
 
 ```
 (venv)$ cd <project-root>
-(venv$ python main.py
+(venv)$ python main.py
 ```

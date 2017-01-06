@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from header import *
+from doref.utils.plantuml.plantuml import *
 
 cd("/*/Bootloader concept")
 Inf("""The bootloader is divided into two separate and mandatory parts: a \
@@ -11,7 +12,7 @@ from reset. The SBL is intended to be downloaded by the PBL into the CPU \
 internal RAM. The SBL can be described as a superset of the PBL, adding \
 functions for erase and program of flash memory and EEPROM. """)
 
-Figure("Typical ECU memory map", "memory_map.png","", {'size':'fit'})
+Figure("Typical ECU memory map", """images/memory_map.eps""","", {'size':'fit'})
 
 Inf("""
 
@@ -76,11 +77,41 @@ begin an initialization phase where it waits for a DiagnosticSesssionControl \
 service for a time period of 20msec called time window for programming session \
 entry detection at startup.""")
 
-Figure("State diagram of ECU","ecu_state_diagram.png",
-        """The state diagram in the figure shows the states of an ECU. In all \
+PlantUML("State diagram of ECU","""
+
+skinparam monochrome true
+
+[*] --> ECUA : Power ON || ECU Reset
+
+state "ECU Application" as ECUA {
+  [*] -->   PBL
+
+  state "Primary Bootloader" as PBL {
+    state Init
+    state "Default Session" as DefSess
+    state "Programing Session" as ProgSession
+
+    DefSess --> Init : DiagnosticSessionControl DefaultSession
+    DefSess --> ProgSession : DiagnosticSessionControl ProgrammingSession
+
+    ProgSession --> Init : DiagnosticSessionControl DefaultSession || S3 timeout
+    ProgSession --> ProgSession : DiagnosticSessionControl ProgrammingSession
+
+    [*] --> Init
+    Init --> DefSess : [t >= 20 ms] No Application Detected
+    Init --> ProgSession : [t < 20 ms] DiagnosticSessionControl ProgrammingSession
+
+  }
+
+  state "Start Up Mode" as SUP
+
+  Init --> SUP : [t >= 20 ms] Application Detected
+  SUP --> ProgSession : [RAMPattern == 0X5A5A5A5A] DiagnosticSessionControl ProgrammingSession
+}
+""", """The state diagram in the figure shows the states of an ECU. In all \
         the states it shall be possible to force the ECU into program mode \
         with the DiagnosticSession Control service with programmingSession \
-        request.""", {'size' : 'fit'})
+        request.""", {'size': 'fit'})
 
 cd("/*/PBL entering to programming session")
 Inf("""The PBL enters into defaultSession, when invalid application software \
@@ -144,10 +175,48 @@ For a faulty programmed ECU or an aborted programming ECU, the "backdoor \
 solution" with a 20msec time window for receiving DiagnosticSessionControl \
 (programmingSession) after reset can still be used.""")
 
-Figure("Application to Bootloader jump","app_to_bl_jump.png")
+PlantUML("Application to Bootloader jump","""
 
-Figure("Bootloader flow diagram","bl_flow_dia.png",
-        "", {'size': 'fit'})
+skinparam monochrome true
+
+Application -down-> "Diagnostic Session Control (Programming Session)"
+
+--> "Write Pattern 0x5A5A5A5A at specified RAM location"
+
+--> "Trigger Reset"
+
+--> "Programming Session"
+""", "", {'size': 'fit'})
+
+
+PlantUML("Bootloader flow diagram","""
+
+skinparam monochrome true
+
+(*) -down-> Reset
+
+if "Bit pattern == 0x5A5A5A5A at fixed address in RAM?" then
+  -right->[true "Warm Start"] "Clear bitpattern at fixed address in RAM"
+  --> "Start ProgrammingSession" as StartProgSess
+else
+  -down->[false "Cold Start"] "Wait for 20 ms"
+  if "DiagnosticSessionControl == ProgrammingSession" then
+  -right->[true] StartProgSess
+  else
+    -down->[false] "Check Applications" as CheckApp
+    if "Valid application Exists?" then
+      -down->[true] "Jump to application SW (Start normal application SW)"
+    else
+      -right->[false] "Default Session" as DefSess
+      if "DiagnosticSessionControl == ProgrammingSession" then
+        -up->[true] StartProgSess
+      else
+        -down->[false] "Default Session" as DefSess
+      endif
+    endif
+  endif
+endif
+""", "", {'size': 'fit'})
 
 ch(node("/*/Functional requirements"), 'text',
         """This section shall contain the list of functional requirements of \
@@ -611,8 +680,64 @@ Table('SecurityAccess service supported NRCs', [
 
         Send if the delay timer is active and a request is transmitted."""]
         ])
-Figure('Security access procedure','sec_accs_proc.png',
-        """The security access procedure shown in figure shall be used to \
+
+
+PlantUML("Security access procedure","""
+
+skinparam monochrome true
+
+partition Tester {
+(*) --> "Start Security Access"
+--> "Request Security Access Seed SID=0x27" as ReqSecSeed
+}
+
+partition ECU {
+  -right-> if "ECU already unlocked?" then
+    -right->[true] "Report Security
+Access Seed of 0x000000
+to indicate that the ECU
+is already unlocked.
+Positiv response SID=0x67" as Unlocked
+  else
+    -down->[false] "Report random
+security access seed.
+Positiv Response SID=0x67" as RandSeed
+  endif
+}
+
+partition Tester {
+RandSeed -left-> "Calculate 3 byte
+key based upon the
+3 byte seed received
+from the ECU"
+
+-down-> "Submit 3 bytes key to ECU
+SID 0x27"
+}
+
+partition ECU {
+  --> if "Key Correct?" then
+    -->[true] "Report security access
+granted.
+Positive Response SID=0x67" as Granted
+  else
+    -->[false] "Report Invalid Key.
+Negative Response SID=0x7f
+Request SID=0x27
+responseCode=0x35" as InvalKey
+  endif
+}
+
+partition Tester {
+InvalKey --> "Secutiry Access denied" as SecDen
+Granted --> "Security Access Granted" as SecGrand
+Unlocked --> SecGrand
+
+SecGrand --> (*)
+SecDen --> (*)
+
+}
+""","""The security access procedure shown in figure shall be used to \
         "unlock" the ECU and grant security access. Upon receipt of a valid \
         seed request, the ECU shall respond with a randomly chosen security \
         seed. This seed shall remain valid or "active" according to the \
@@ -621,7 +746,7 @@ Figure('Security access procedure','sec_accs_proc.png',
         seed sent with a common algorithm. If ECU calculated Security key and \
         the tester(calculated and sent to ECU) sent Security key matches, only \
         then the security is unlocked, if not it will remain locked.""",
-        {'size':'fit'})
+         {'size': 'fit'})
 
 ch(node("/*/RoutineControl service requirements"), 'text',
     """The RoutineControl service shall be used for activating the SBL after \

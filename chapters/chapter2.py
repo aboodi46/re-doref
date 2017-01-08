@@ -1001,3 +1001,494 @@ Table('RoutineControl service supported NRCs', [
         location in the permanent memory device (e.g. Flash Memory) and the \
         access to that memory location fails."""],
         ])
+
+ch(node("/*/RequestDownload service requirements"), 'text',
+"""The requestDownload service is used by the tester to initiate a data \
+transfer from the tester to the ECU (download). After the ECU has received \
+the requestDownload request message, the ECU shall take all necessary actions \
+to receive data before it sends a positive response message.""")
+
+cd("/*/RequestDownload service requirements")
+
+Inf("""The request download service includes the “dataFormatIdentifier” \
+parameter of one byte value with each nibble encoded separately. The high \
+nibble specifies the “compressionMethod”, and the low nibble specifies the \
+“encryptingMethod”. The value 00 hex specifies that neither compressionMethod \
+nor encryptingMethod is used.")
+Inf("The request download service includes the \
+“addressAndLengthFormatIdentifier” parameter of one bye the bit 7 to bit 4 \
+specifies the number of bytes allocated to address the memory and the bit 3 to \
+bit 0 specifies number of bytes of the information to be written into the \
+memory.""")
+
+Inf("""The request download service includes the “memory address” parameter \
+indicating the starting address of ECU memory to which data is to be written. \
+The number of bytes used for this address is defined by the low nibble (bit 3 \
+- 0) of the addressFormatIdentifier parameter. For ex: (0x01F00001 is the \
+starting address the byte 3 =01, byte 2= F0, byte 1=00, byte 0=01 with the MSB \
+bit of address first).""")
+
+Inf("""The request download service includes the “memorySize \
+(unCompressedMemorySize)” parameter used by the ECU to compare the \
+uncompressed memory size with the total amount of data transferred during the \
+TransferData service. This increases the programming security. The number of \
+bytes used for this size is defined by the high nibble (bit 7 - 4) of the \
+addressAndLengthFormatIdentifier. For addressAndLengthFormat - 44 hex value is \
+used so that the range of memory that can be addressed is (0x00000000 to \
+0xFFFFFFFF) and the number of bytes that can be read from the memory ranges \
+from 0x00000000 to 0xFFFFFFFF bytes.""")
+
+Req('', 'This service shall be supported for both PBL and SBL.')
+Req('', """The bootloader shall support RequestDownload \
+service (34 hex) to initiate a data transfer from the tester to the ECU. """)
+Req('',"""The positive message response for RequestDownload \
+service (34 hex) shall contain lengthFormatIdentifier 20 hex to hold the \
+maximum block length which can transmit each download service.""")
+Req('',"""The RequestDownload service (34 hex) request shall \
+support dataFormatIdentifier 00 hex (uncompressed data) and \
+addressAndLengthFormatIdentifier 44 hex.""")
+Req('',"""BL shall send NRC with requestOutOfRange (0x31) if \
+RequestDownload service is requested with the memory address range that \
+doesn’t fall in the supported memory area.""")
+Req('',"""If RequestDownload service is requested before the \
+security is unlocked then the BL shall send NRC with SecurityAccessDenied \
+(0x33).""")
+
+Inf("The NRC uploadDownloadNotAccepted (0x70) shall not supported by BL but \
+can be implemented based on customer requirements. The detail on this \
+requirement shall be provided in Portspecific SRS under section name Port \
+Specific requirements.")
+
+Table('RequestDownload request message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestDownload request SID', '34'],
+        ['2', 'dataFormatIdentifier', '00-FF'],
+        ['3', 'addressAndLengthFormatIdentifier', '44'],
+        ['4', 'memoryAddress[byte 1] (MSB)', '00-FF'],
+        ['5', 'memoryAddress[byte 2]', '00-FF'],
+        ['6', 'memoryAddress[byte 3]', '00-FF'],
+        ['7', 'memoryAddress[byte 4](LSB)', '00-FF'],
+        ['8', 'memorySize[byte 1] (MSB)', '00-FF'],
+        ['9', 'memorySize[byte 2]', '00-FF'],
+        ['10', 'memorySize[byte 3]', '00-FF'],
+        ['11', 'memorySize[byte 4](LSB)', '00-FF']
+        ], 'Message type: request, message direction: tester to ECU')
+Table('RequestDownload response message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestDownload response SID', '74'],
+        ['2', 'lengthFormatIdentifier', '20'],
+        ['3', 'maxNumberofBlockLength [byte 1] (MSB)', '00-0F'],
+        ['4', 'maxNumberofBlockLength [byte 2] (LSB)', '00-FF'],
+        ], 'Message type: response, message direction: ECU to tester')
+Table('RequestDownload service supported NRCs', [
+        ['Hex', 'Description'],
+
+        ['13', """**incorrectMessageLengthOrInvalidFormat**
+
+        The length of the message is wrong."""],
+
+        ['22', """**conditionsNotCorrect**
+
+        This code shall be returned if the criteria for the request \
+        DiagnosticSessionControl are not met."""],
+
+        ['31', """**RequestOutOfRange**
+
+        This code shall be sent if none of the requested dataIdentifier values \
+        are supported by the device or the client exceeded the maximum number \
+        of dataIdentifiers allowed to be requested at a time."""],
+
+        ['33', """**SecurityAccessDenied (SAD)**
+
+        This code shall be sent if the requested reset is secured \
+        and the server is not in an unlocked state."""],
+
+        ['70', """**uploadDownloadNotAccepted (UDNA)**
+
+        This response code indicates that an attempt to download to a server's \
+        memory cannot be accomplished due to fault conditions."""]
+        ])
+Inf("""The file download method provides a means for an off-board tester to \
+send multiple bytes of data to an ECU. The file download process combines a \
+number of bootloader services to achieve this.
+
+The file download sequence is based on the non-volatile server memory \
+programming process described in ref. [2]. Only programming step (STP2) and \
+post-programming step (STP3) of Programming Phase #1 is used.
+
+All released software files which are downloadable to the ECU shall be capable \
+of being downloaded to the ECU individually or in any grouping combination \
+independent of order. The only exception to this is that the secondary \
+bootloader shall always be required to be downloaded first when supported. \
+Any other required grouping or order dependencies shall require explicit\
+approval by the responsible authority appointed by the operating company and \
+specific agreements with all affected tools from EOL and/or service.
+
+ As an example, if the ECU supports a secondary bootloader (file A), a \
+ strategy memory area (file B), and a calibration memory area (file C), then \
+ the following download sequences shall be supported:
+
+* Transition to programmingSession, download file A then B
+* Transition to programmingSession, download file A then C
+* Transition to programmingSession, download file A, B, then C
+* Transition to programmingSession, download file A, C, then B""")
+
+#TODO: add diagrams
+#Figure("#9-10 Programming sequence")
+
+
+ch(node("/*/RequestUpload service requirements"), 'text',
+"""The RequestUpload service is used by the tester to initiate a data transfer \
+from the ECU to the tester (upload).The RequestUpload service shall be \
+optional.""")
+cd("/*/RequestUpload service requirements")
+Inf("""The request upload service includes the “dataFormatIdentifier” \
+parameter of one byte value with each nibble encoded separately. The high \
+nibble specifies the “compressionMethod”, and the low nibble specifies the \
+“encryptingMethod”. The value 00 hex specifies that no compressionMethod nor \
+encryptingMethod is used.""")
+Inf("""The request upload service includes the \
+“addressAndLengthFormatIdentifier” parameter of one bye the bit 7 to bit 4 \
+specifies the number of bytes allocated to address the memory and the bit 3 to \
+bit 0 specifies number of bytes of the information wanted from the memory.""")
+Inf("""The request upload service includes the “memory address” indicates the \
+starting address of server memory from which data is to be retrieved. The \
+number of bytes used for this address is defined by the low nibble (bit 3 - 0) \
+of the addressFormatIdentifier parameter. For ex: (0x01F00001 is the starting \
+address the byte 3 =01, byte 2= F0, byte 1=00, byte 0=01 with the MSB bit of \
+address first). The use of a memoryIdentifier would be a dual processor server \
+with 16-bit addressing and memory address overlap (when a given address is \
+valid for either processor but yields a different physical memory device or \
+when internal and external flash is used). In this case, an otherwise unused \
+byte within the memoryAddress parameter can be specified as a memoryIdentifier \
+used to select the desired memory device.""")
+Inf("""The request upload service includes the “memorySize \
+(unCompressedMemorySize)” used by the server to compare the uncompressed \
+memory size with the total amount of data transferred during the TransferData \
+service. This increases the programming security. The number of bytes used for \
+this size is defined by the high nibble (bit 7 - 4) of the \
+addressAndLengthFormatIdentifier.""")
+
+Req('', 'This service shall be supported only in SBL.')
+Req('', """The bootloader shall support RequestUpload \
+service (35 hex) to initiate a data transfer from the ECU to the tester.""")
+Req('',"""The RequestUpload service (35 hex) request shall \
+support dataFormatIdentifier 00 hex and addressAndLengthFormatIdentifier 44 \
+hex only.""")
+Req('',"""The positive message response for RequestUpload \
+service (35 hex) shall contain lengthFormatIdentifier 20 hex to hold the 16 \
+bit CRC checksum value from the ECU.""")
+Req('',"""The conditionsNotCorrect (0x22) shall be issued \
+for the upload request while ECU is in PBL programming session or \
+RequestUpload service is requested when BL is not completed the previous \
+upload request in the current programming session.""")
+Req('', """BL shall send NRC with requestOutOfRange (0x31) if RequestUpload \
+service is requested with the memory address range that doesn’t fall in the \
+supported memory area.""")
+Req('',""" If RequestUpload service is requested before the security is \
+unlocked then the BL shall send NRC with SecurityAccessDenied (0x33).""")
+
+Inf(""""The NRC uploadDownloadNotAccepted (0x70) is not supported by BL but \
+can be implemented based on customer requirements. The detail on this \
+requirement shall be provided in Portspecific SRS under section name Port \
+Specific requirements.""")
+
+Table('RequestUpload request message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestUpload request SID', '35'],
+        ['2', 'dataFormatIdentifier', '00'],
+        ['3', 'addressAndLengthFormatIdentifier', '44'],
+        ['4', 'memoryAddress[byte 1] (MSB)', '00-FF'],
+        ['5', 'memoryAddress[byte 2]', '00-FF'],
+        ['6', 'memoryAddress[byte 3]', '00-FF'],
+        ['7', 'memoryAddress[byte 4](LSB)', '00-FF'],
+        ['8', 'memorySize[byte 1] (MSB)', '00-FF'],
+        ['9', 'memorySize[byte 2]', '00-FF'],
+        ['10', 'memorySize[byte 3]', '00-FF'],
+        ['11', 'memorySize[byte 4](LSB)', '00-FF']
+        ], 'Message type: request, message direction: tester to ECU')
+Table('RequestUpload response message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestUpload response SID', '75'],
+        ['2', 'lengthFormatIdentifier', '20'],
+        ['3', 'maxNumberofBlockLength [byte 1] (MSB)', '00-0F'],
+        ['4', 'maxNumberofBlockLength [byte 2] (LSB)', '00-FF'],
+        ], 'Message type: response, message direction: ECU to tester')
+Table('RequestUpload service supported NRCs', [
+        ['Hex', 'Description'],
+
+        ['13', """**incorrectMessageLengthOrInvalidFormat**
+
+        The length of the message is wrong."""],
+
+        ['22', """**conditionsNotCorrect**
+
+        This code shall be returned if the criteria for the request \
+        DiagnosticSessionControl are not met."""],
+
+        ['31', """**RequestOutOfRange**
+
+        This code shall be sent if none of the requested dataIdentifier values \
+        are supported by the device or the client exceeded the maximum number \
+        of dataIdentifiers allowed to be requested at a time."""],
+
+        ['33', """**SecurityAccessDenied (SAD)**
+
+        This code shall be sent if the requested reset is secured \
+        and the server is not in an unlocked state."""],
+
+        ['70', """**uploadDownloadNotAccepted (UDNA)**
+
+        This response code indicates that an attempt to download to a server's \
+        memory cannot be accomplished due to fault conditions."""]
+        ])
+
+Inf("""The file upload method provides a means for an ECU to send multiple \
+bytes of data to an off-board tester. The file upload process combines a number \
+of bootloader services to achieve this.
+
+Message sequencing consists of a means for initiating the upload, transfer \
+of messages and exit of the upload operation as detailed in \
+`/*/File upload procedure (1 of 5)`_ to `/*/File upload procedure (5 of 5)`_.""")
+
+#TODO: add diagrams
+#Figure("#17-21 File upload procedure")
+Figure('File upload procedure (1 of 5)', '.png')
+Figure('File upload procedure (5 of 5)', '.png')
+
+ch(node("/*/TransferData service requirements"), 'text',
+"""The TransferData service is used by the tester to transfer data either from \
+the tester to the ECU (download) or from the ECU to the tester (upload).""")
+cd("/*/TransferData service requirements")
+
+Inf("The data transfer direction is defined by the preceding RequestDownload \
+or RequestUpload service. If the tester initiated a RequestDownload the data \
+to be transferred is included in the parameter(s) transferRequestParameter in \
+the TransferData request message(s). If the tester initiated a RequestUpload \
+the data to be uploaded is included in the parameter(s) \
+transferResponseParameter in the TransferData response message(s).")
+Inf("""The TransferData service request includes a blockSequenceCounter to \
+allow for an improved error handling in case a TransferData service fails \
+during a sequence of multiple TransferData requests. The blockSequenceCounter \
+shall be handled by the tester and the ECU. It is recommended a tester \
+retransmit the transferData service (i.e., with the same blockSequenceCounter \
+and data) at least two times if no response is received from the ECU. If an \
+ECU receives a transferData request during an active download sequence with \
+the same blockSequenceCounter as the last accepted transferData request, it \
+shall respond with a positive response without writing the data once again to \
+its memory.
+
+The blockSequenceCounter of the ECU shall be initialised to one (1) when \
+receiving a RequestDownload (34 hex) or RequestUpload (35 hex) request \
+message. This means that the first TransferData (36 hex) request message \
+following the RequestDownload (34 hex) or RequestUpload (35 hex) request \
+message starts with a blockSequenceCounter of one (1).""")
+
+Req('',"""This service shall be supported in both PBL and SBL.""")
+Req('',"""The Bootloader shall support TransferData service (36 hex) to \
+transfer data either from the tester to the ECU (download) or from the ECU to \
+the tester (upload).""")
+Req('',"""f TransferData request to download/upload data is correctly received \
+and processed in the Bootloader but the positive response message does not \
+reach the tester, then tester would determine an application layer timeout and \
+would repeat the same request. Bootloader receives TransferData (0x36) service \
+request during an active download or active upload sequence with the same \
+blockSequenceCounter as the last accepted TransferData request, then \
+Bootloader shall respond with a positive response without writing the data \
+once again to its memory.""")
+Req('',"""If the TransferData request to download data is not received \
+correctly in the ECU, then the ECU would not send a positive response message. \
+The tester would determine an application layer timeout and would repeat the \
+same request (including the same blockSequenceCounter). The ECU would receive \
+the repeated TransferData request and shall determine based on the included \
+blockSequenceCounter that this is a new TransferData. The ECU would process \
+the service and would send the positive response message.""")
+Req('',"""If the TransferData request to upload data is not received correctly \
+in the ECU, then the ECU shall not send a positive response message. The \
+tester would determine an application layer timeout and would repeat the same \
+request (including the same blockSequenceCounter). The ECU shall receive the \
+repeated TransferData request and shall determine based on the included \
+blockSequenceCounter that this is a new TransferData. The ECU shall process \
+the service and would send the positive response message.""")
+Req('',"""In TransferData request for download, if Number of bytes transferred \
+is not equal to   the length in transfer data request then the BL shall send \
+the Negative response code with incorrectMessageLengthOrInvalidFormat \
+(0x13).""")
+Req('',"""If TransferData request is requested before the RequestDownload or \
+RequestUpload security is active then the BL shall send NRC with \
+requestSequenceError (0x24).""")
+Req('',"""In TransferData request, if requested total transfer data length \
+exceeds the length requested in download/upload request then the BL shall send \
+NRC with requestOutOfRange (0x31).""")
+Req('',"""If the active service is transfer data (0x36) for request upload \
+(0x35) AND if number of attempts of starting P2*Server timer exceeds the NRC78 \
+max Limit  then the BL shall send NRC with transferDataSuspended(0x71).""")
+Req('',"""The BL shall respond NRC with generalProgrammingFailure (0x72), if \
+the BL detects an error when accessing internal memory during transfer data \
+for request download and transfer data for request upload.""")
+Req('',"""In transfer data for request download/upload If block sequence \
+counter is NOT same as previous block AND If received block sequence counter \
+is NOT EQUAL to  the expected block sequence counter i.e, previous block \
+sequence counter + 1 then the BL shall send NRC with \
+wrongBlockSequenceCounter(0x73).""")
+
+Table('TransferData request message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'TransferData request SID', '36'],
+        ['2', 'blockSequenceCounter', '00-FF'],
+        ['3', 'transferRequestParameterRecord[transferRequestParameter#1]', '00-FF'],
+        ['4', 'transferRequestParameterRecord[transferRequestParameter#2]', '00-FF'],
+        ['5', 'transferRequestParameterRecord[transferRequestParameter#3]', '00-FF'],
+        ['6', 'transferRequestParameterRecord[transferRequestParameter#4]', '00-FF'],
+        ['..','..','..'],
+        ['n', 'transferRequestParameterRecord[transferRequestParameter#n]', '00-FF'],
+        ], 'Message type: request, message direction: tester to ECU')
+Table('TransferData response message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'TransferData response SID', '76'],
+        ['2', 'blockSequenceCounter', '00-FF']
+        ], 'Message type: response, message direction: ECU to tester')
+Table('RequestUpload service supported NRCs', [
+        ['Hex', 'Description'],
+
+        ['13', """**incorrectMessageLengthOrInvalidFormat**
+
+        The length of the message is wrong."""],
+
+        ['24', """**RequestSequenceError**
+
+        The RequestDownload or RequestUpload service is not active when a \
+        request for this service is received."""],
+
+        ['31', """**RequestOutOfRange**
+
+        This code shall be sent if none of the requested dataIdentifier values \
+        are supported by the device or the client exceeded the maximum number \
+        of dataIdentifiers allowed to be requested at a time."""],
+
+        ['33', """**SecurityAccessDenied (SAD)**
+
+        This code shall be sent if the requested reset is secured \
+        and the server is not in an unlocked state."""],
+
+        ['71', """**transferDataSuspended**
+
+        This response code indicates that a data transfer operation was \
+        halted due to some fault."""],
+
+        ['72', """**GeneralProgrammingFailure**
+
+        This return code shall be sent if the server detects an error when \
+        performing a routine, which accesses server internal memory. An \
+        example is when the routine erases or programs a certain memory \
+        location in the permanent memory device (e.g. Flash Memory) and the \
+        access to that memory location fails."""],
+
+        ['73', """**WrongBlockSequenceCounter**
+
+        This return code shall be sent if the server detects an error in the \
+        sequence of the blockSequenceCounter.
+
+        Note that the repetition of a TransferData request message with a \
+        blockSequenceCounter equal to the one included in the previous \
+        TransferData request message shall be accepted by the server."""]
+        ])
+
+ch(node("/*/RequestTransferExit service requirements"), 'text',
+"""This service is used by the tester to terminate a data transfer between \
+tester and ECU.""")
+cd("/*/RequestTransferExit service requirements")
+
+Req('','This service shall be supported in both PBL and SBL.')
+Req('',"""The Bootloader shall support RequestTransferExit service (37 hex) to \
+terminate a data transfer either from the tester to the ECU (download) or from \
+the Bootloader to the tester (upload).""")
+Req('',"""The Bootloader shall return two byte checksum calculated from the \
+specified address range in recent request download as positive response for \
+RequestTransferExit service (37 hex) request.""")
+Req('',"""If Transfer Exit request shall be requested before the \
+RequestDownload is active then the BL shall send NRC \
+with requestSequenceError(0x24).""")
+
+Table('RequestTransferExit request message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestTransferExit request SID', '37']
+        ], 'Message type: request, message direction: tester to ECU')
+Table('RequestTransferExit response message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'RequestTransferExit response SID', '77'],
+        ['2', 'transferResponseParameterRecord[transferResponseParameter#1 ] \
+        =checksum byte 1 (MSB)', '00-FF'],
+        ['3', 'transferResponseParameterRecord[transferResponseParameter#2 ] \
+        =checksum byte 2 (LSB)', '00-FF'],
+        ], 'Message type: response, message direction: ECU to tester')
+Table('RequestUpload service supported NRCs', [
+        ['Hex', 'Description'],
+
+        ['13', """**incorrectMessageLengthOrInvalidFormat**
+
+        The length of the message is wrong."""],
+
+        ['24', """**RequestSequenceError**
+
+        The RequestDownload or RequestUpload service is not active when a \
+        request for this service is received."""]])
+
+Inf("""The RequestTransferExit, transferResponseParameterRecord shall include \
+a two byte checksum, which is required by the tester to support the transfer \
+of data. The two byte checksum shall be calculated including all data bytes \
+specified in the latest RequestDownload service (i.e., the data bytes \
+following the blockSequenceCounter in each TransferData request). The checksum \
+shall be calculated after the data bytes have been programmed into flash memory.
+
+The checksum algorithm to be used shall be the CRC16-CITT:
+
+* Polynomial: x^6+x^2+x^5+1 (1021 hex)
+
+* Initial value: FFFF (hex)
+
+For a fast CRC16-CITT calculation a look-up table implementation is the \
+preferred solution. For ECUs with a limited amount of flash memory (or RAM), \
+other implementations may be necessary.""")
+
+ch(node("/*/TesterPresent service requirements"),'text',
+"""This service is used to indicate to an ECU (or ECUs) that a tester is still \
+connected to the vehicle and that certain diagnostic services and/or \
+communication that have been previously activated are to remain active.""")
+cd("/*/TesterPresent service requirements")
+Inf("""This service is used to keep one or multiple servers in a diagnostic \
+session other than the defaultSession. This can either be done by transmitting \
+the TesterPresent request message periodically or in case of the absence of other \
+diagnostic services to prevent the server(s) from automatically returning to \
+the defaultSession. The detailed session requirements that apply to the use of \
+this service when keeping a single server or multiple servers in a diagnostic \
+session other than the defaultSession.""")
+
+Req('','This service shall be supported in both PBL and SBL.')
+Req('',"""The Diagnostic module shall support TesterPresent service (3E hex) \
+to indicate the ECU that the tester is still connected and that certain \
+diagnostic services and/or communications that have been previously activated \
+are to remain active.""")
+
+Table('TesterPresent request message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'TesterPresent request SID', '3E'],
+        ['2', """zeroSubFunction suppressPosRspMsgIndicationBit = FALSE or \
+        TRUE (bit7 = 0 or 1)""", '00 or 80']
+        ], 'Message type: request, message direction: tester to ECU')
+Table('TesterPresent response message flow', [
+        ['Data byte', 'Description', 'Byte Value(Hex)'],
+        ['1', 'TesterPresent response SID', '7E'],
+        ['2', 'zeroSubFunction', '00']
+        ], 'Message type: response, message direction: ECU to tester')
+Table('RequestUpload service supported NRCs', [
+        ['Hex', 'Description'],
+
+        ['12', """**subFunctionNotSupported**
+
+        Send if the sub-function parameter in the request message is not \
+        supported."""],
+
+        ['13', """**incorrectMessageLengthOrInvalidFormat**
+
+        The length of the message is wrong."""]])

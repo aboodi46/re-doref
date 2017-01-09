@@ -61,8 +61,17 @@ class BLS830(IEEE830SRS):
                 "RequestUpload service requirements",
                 "TransferData service requirements",
                 "RequestTransferExit service requirements",
-                "TesterPresent service requirements"]
+                "TesterPresent service requirements"],
+                "Network requirements", [
+                    "Network layer requirements",
+                    "Data link layer requirements",
+                    "Session layer requirements",
+                    "LIN transport layer requirements",
+                    "Transport protocol handling in LIN master requirements",
+                    "Slave node transmission handler requirements"
+                ]
         ]
+
     ]
     def _init_(self, name, authors, properties=None, folder=None):
         IEEE830SRS.init(self, name, authors, properties, folder)
@@ -74,6 +83,7 @@ BLS830("Software Requirements for Secure Bootloader",
 
 from chapters.chapter1 import *
 from chapters.chapter2 import *
+from chapters.chapter3 import *
 
 node("/").dump()
 node("/").genPDF()

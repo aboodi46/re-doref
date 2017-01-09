@@ -6,10 +6,6 @@ its requirements usign the
 [DOREF](https://www.pimes.fh-dortmund.de/gitlab/re-research-group/doref)
 framework.
 
-##TODO:
-
-- [ ] Create PlantUML Diagrams
-
 ## Installing dependencies
 
 First ```latex``` package have to be installed by running;

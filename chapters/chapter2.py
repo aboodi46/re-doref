@@ -1133,9 +1133,8 @@ specific agreements with all affected tools from EOL and/or service.
 * Transition to programmingSession, download file A, B, then C
 * Transition to programmingSession, download file A, C, then B""")
 
-#TODO: add diagrams
-#Figure("#9-10 Programming sequence")
-
+Figure("Programming sequence (I)", "images/figure9.png", "", {'size': 'fit'})
+Figure("Programming sequence (II)", "images/figure10.png", "", {'size': 'fit'})
 
 ch(node("/*/RequestUpload service requirements"), 'text',
 """The RequestUpload service is used by the tester to initiate a data transfer \
@@ -1251,10 +1250,8 @@ Message sequencing consists of a means for initiating the upload, transfer \
 of messages and exit of the upload operation as detailed in \
 `/*/File upload procedure (1 of 5)`_ to `/*/File upload procedure (5 of 5)`_.""")
 
-#TODO: add diagrams
-#Figure("#17-21 File upload procedure")
-Figure('File upload procedure (1 of 5)', '.png')
-Figure('File upload procedure (5 of 5)', '.png')
+Figure('File upload procedure (1 of 5)', 'images/fileup1.png', "", {'size': 'fit'})
+Figure('File upload procedure (5 of 5)', 'images/fileup2.png', "", {'size': 'fit'})
 
 ch(node("/*/TransferData service requirements"), 'text',
 """The TransferData service is used by the tester to transfer data either from \

@@ -1,4 +1,5 @@
 from header import *
+from doref.utils.plantuml.plantuml import *
 
 ch(node("/*/Network layer requirements"), 'text',
 """Physically addressing (1 to 1 communication) shall be supported for all \
@@ -11,7 +12,7 @@ addressing (1 to n communication) shall only be supported for single frame \
 communication.""")
 cd("/*/Network layer requirements")
 
-Req('',"""The Network layer shall support both physically and functionally \
+Req("","""The Network layer shall support both physically and functionally \
 addressed requests from the tester.""")
 Req('',"""The Network layer shall support multiple frame message transmission \
 and reception.""")
@@ -184,5 +185,116 @@ master have sent the request on LIN i.e. the LIN master shall not poll for a \
 diagnostic response (send frame identifier 0x3D) for functionally addressed \
 requests.""")
 
-# TODO: add diagrams
-#Figure(#27 + explanation)
+PlantUML("", """
+skinparam monochrome true
+
+state "Idle" as idle
+state "Receive Physical Request" as phy_req
+state "Transmit Physical Response" as response
+state "Receive Funcional Request" as func_req
+
+[*] --> idle
+idle --> phy_req : (1)
+
+phy_req --> idle : (2)
+phy_req --> phy_req : (3)
+
+phy_req --> response : (4)
+response --> phy_req : (10)
+
+response --> idle : (5)
+
+idle --> idle : (9)
+
+idle --> func_req : (7)
+func_req --> idle : (8)
+""", "", {'size': 'fit'})
+
+Inf("""Info
+
+1. **Idle → Receive physical request**
+
+ **Condition:** A master request frame has been received with the NAD matching \
+ the slave node's own NAD.
+
+ **Action:** Start receiving and processing the physical request according to \
+ the transport layer requirements.
+
+2. **Receive physical request → Idle**
+
+**Condition:** A transport layer error has occurred or a master request frame \
+with an NAD different from the slave node's own NAD has been received.
+
+**Action:** Stop receiving and processing the physical request. Do not respond \
+to slave response frames.
+
+3. **Receive physical request → Receive physical request**
+
+**Condition:** The physical request has not been completely received yet and \
+master request frames are received with the NAD set to the slave node's own \
+NAD. A functional addressed master request frame shall be ignored.
+
+**Action:** Continue receiving and processing the physical request.
+
+4. **Receive physical request → Transmit physical response**
+
+**Condition:** The physical request has been completely received.
+
+**Action:** Process the diagnostic request. If a new physical request with the \
+NAD set to the slave node's own address is received while processing the \
+previous request, the slave node shall discard the current request or response \
+data and shall start receiving the new request.
+
+5. **Transmit physical response → Transmit physical response**
+
+**Condition:** The physical response has not been completely transmitted yet. \
+A functional addressed request shall be ignored.
+
+**Action:** Keep responding to slave response frames according to the \
+transport layer requirements.
+
+Note: A slave node will not process a functional addressed request while in \
+transmit physical response state. Therefore it must be ensured by the external \
+test tool that functionally addressed requests that shall be processed by all \
+slave nodes are only transmitted if no further responses from any slave node \
+are expected. Otherwise there's no guarantee nor indication for the external \
+test tool whether a slave node has processed the functional request.
+
+6. **Transmit physical response → Idle**
+
+**Condition:** The physical response has been completely transmitted, a LIN \
+transport layer error occurred or a request with the NAD set to a different \
+or the same value as the slave node's own NAD has been received.
+
+**Action:** Discard the request and response data. Stop responding to slave \
+response frames.
+
+7. **Idle → Receive functional request**
+
+**Condition:** A master request frame with the NAD parameter set to the \
+functional NAD has been received.
+
+**Action:** Receive and process the master request frame according to the \
+transport layer. Do not respond to the slave response frame headers.
+
+8. **Receive functional request → Idle**
+
+**Condition:** The functional request was processed.
+
+**Action:** Discard any response data. Stop responding to slave response frames.
+
+9. **Receive functional request → Idle**
+
+ **Condition:** No request is received and no response is pending.
+
+ **Action:** Do not respond to any slave response frames.
+
+10. **Transmit physical response → Receive physical request**
+
+**Condition:** The previous request has been processed and a diagnostic \
+master request frame with the NAD parameter set to the slave node's own \
+node address has been received.
+
+**Action:** Discard the response data. Start receiving and processing the \
+physical request according to the LIN transport protocol requirements.
+""")

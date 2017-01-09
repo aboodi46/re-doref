@@ -185,7 +185,7 @@ master have sent the request on LIN i.e. the LIN master shall not poll for a \
 diagnostic response (send frame identifier 0x3D) for functionally addressed \
 requests.""")
 
-PlantUML("", """
+PlantUML("Slave node transmission handler", """
 skinparam monochrome true
 
 state "Idle" as idle

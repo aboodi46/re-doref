@@ -32,6 +32,13 @@ And finally install ```pip3``` by running;
 # apt-get install python3-pip
 ```
 
+### Git LFS
+
+Binary files of this project are stored within the project's repository using ```git LFS```.
+To be able to build the document first ```git LFS``` has to be installed.
+
+For instructions on how to install ```git LFS``` click [here](https://help.github.com/articles/installing-git-large-file-storage/#platform-linux)
+
 ## Virtual Environment
 
 It is highly recommended to create a ```python``` ***virtual environment*** and
